@@ -37,3 +37,10 @@ logs
 # OS generated files
 Thumbs.db
 Desktop.ini
+
+# Python virtual environment
+venv/
+backend/venv/
+
+# Backend environment variables
+backend/.env
