@@ -1,0 +1,13 @@
+{
+    "name": "connection",
+    "version": "1.0.0",
+    "description": "Frontend -> Node proxy -> Python backend -> MongoDB example",
+    "main": "server.js",
+    "scripts": {
+      "start": "node server.js"
+    },
+    "dependencies": {
+      "node-fetch": "^3.3.2"
+    }
+  }
+  
