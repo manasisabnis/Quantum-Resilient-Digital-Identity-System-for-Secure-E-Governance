@@ -1,131 +1,99 @@
-# ⚔️ Updated Version - Quantum Aegis: Quantum-Resilient Cryptographic Framework 
+# Connection project — README
 
-Quantum Aegis is an **Hybrid Cryptographic Demo** that combines classical and post-quantum primitives to demonstrate a **quantum-resistant secure communication flow**.  
-It pairs **AES-256-GCM** for symmetric confidentiality, **SHA3-256** for hashing, and **PQC algorithms (Kyber for KEM, Dilithium for signatures)** for key exchange and authentication.
+This project is a small demo that shows a Node "middle" server (static file serving + proxy) running on Windows and a Python backend on a Kali VM which performs credential creation and decryption using post-quantum primitives (KEM + AEAD + signatures).
 
----
+Overview of what you have implemented
+- `server.js` — Node static file server and proxy that forwards POST API calls to the Python backend. It supports configuration via:
+  - environment variable `PY_BACKEND`
+  - CLI flag `--py-backend=http://host:port`
+  - optional `.env` file (if you install `dotenv`).
+- `main.py` — Python CLI + small Flask HTTP API. I added programmatic `register_user()` and a minimal Flask app exposing:
+  - `POST /api/register` — creates keys and a credential envelope (writes `Keys/` and `Credentials/` on the Kali host)
+  - `POST /api/login` — accepts `{ email, password }`, decrypts the stored envelope using the KEM private key, verifies password and returns success or error JSON.
+- `index.html` — simple frontend (served by the Node server) with two views: Register and Login. It POSTs to the middle Node server at `http://localhost:3001/api/...` which proxies the request to the Python backend.
 
-## 🔑 Highlights
-- **Hybrid stack:** AES-256-GCM + Kyber (KEM) + Dilithium (signatures) + SHA3-256  
-- **Post-quantum ready:** Resistant against both classical and quantum adversaries  
-- **Modular design:** Small, well-segregated modules (`key_exchange.py`, `signature.py`, `encryption.py`, `hashing.py`)  
-- **Developer-friendly:** Easy to run in a Python `venv` on Linux (recommended)  
-- **Educational:** Great for demonstrating PQC integration into real-world protocols  
+Files changed/added
+- `main.py` (edited) — added `register_user()` and Flask endpoints `/api/register` and `/api/login`.
+- `server.js` (edited) — added optional `.env` support, `--py-backend` CLI flag parsing, and proxying for `/api/register` and `/api/login`.
+- `index.html` (edited) — added Register/Login UI, client-side JS to call the middle server.
+- `README.md` (this file) — usage and troubleshooting.
 
----
+How to run (recommended setup)
 
-## 🏗️ Architecture Diagram
+1) On Kali (Python backend)
 
-```text
-               ⚔️ Quantum Aegis — Secure Flow
+```bash
+# open the project folder where `main.py` lives
+cd ~/Tools/connection
 
-     ┌──────────────┐                            ┌──────────────┐
-     │    Client    │                            │    Server    │
-     └──────┬───────┘                            └──────┬───────┘
-            │                                         │
-            │     1. Kyber Key Exchange (KEM)         │
-            │─────────────── Public Key ─────────────▶│
-            │◀────────────── Ciphertext ───────────── │
-            │                                         │
-            │     Shared Secret (ss) established      │
-            │                                         │
-            │     2. Dilithium Signature              │
-            │───────────── Signed Message ───────────▶│
-            │◀──────────── Verification ───────────── │
-            │                                         │
-            │     3. AES-256-GCM Encryption           │
-            │────────────── Encrypted Msg ───────────▶│
-            │◀────────────── Encrypted Reply ──────── │
-            │                                         │
-            │     4. SHA3-256 Hashing (Integrity)     │
-            │────────────── Hash Digest ─────────────▶│
-            │                                         │
-     ┌──────┴───────┐                            ┌──────┴───────┐
-     │  Post-Quantum│                            │  Post-Quantum│
-     │   Security   │                            │   Security   │
-     └──────────────┘                            └──────────────┘
+# (optional) create and activate a venv
+python3 -m venv venv
+source venv/bin/activate
+
+# install required Python packages
+pip install --upgrade pip
+pip install flask cryptography
+
+# run as an HTTP API listening on all interfaces (useful if the host will access it)
+export PY_HOST=0.0.0.0
+export PY_PORT=5000
+python3 main.py --http
 ```
 
-## 📂 Project Structure
-<pre>
-Quantum_Aegis/
-├── demo.py                    # 🎯 Minimal demo runner<br>
-├── main.py                    # 🚀 Application launcher (runs full hybrid PQC flow)<br>
-├── key_exchange.py            # 🔑 Kyber KEM operations<br>
-├── signature.py               # ✍️ Dilithium digital signatures<br>
-├── encryption.py              # 🔒 AES-256-GCM encryption/decryption<br>
-├── hashing.py                 # 🌀 SHA3-256 hashing helpers<br>
-├── requirements.txt           # 📦 Python dependencies<br>
-└── README.md                  # 📖 Project documentation<br>
-</pre>
+Notes:
+- The Flask dev server is fine for testing. The API will write generated files under `Keys/` and `Credentials/` on the Kali host.
 
-## ⚙️ Setup
-   1. Install prerequisites (Linux, e.g. Ubuntu/Kali/Debian)
-   ```bash
-   sudo apt update
-   sudo apt install -y python3 python3-venv python3-pip build-essential cmake git libssl-dev pkg-config
-   ```
-   2. Create & activate a virtual environment
-   ```bash
-   python3 -m venv venv
-   source venv/bin/activate
-   ```
-   3. Install dependencies
-   ```bash
-   pip install --upgrade pip
-   pip install -r requirements.txt
-   ```
-   If pip install oqs fails due to missing wheels, see the Optional: Build liboqs from source section below.
+2) On Windows (Node middle server)
 
-   4. Optional: Build liboqs from source
-   Use this only if the oqs wheel is unavailable for your Python version/platform.
+```powershell
+cd "C:\Users\bhara\PROJECT\WEB DEV\connection"
 
-   ```bash
-   git clone --branch main https://github.com/open-quantum-safe/liboqs.git
-   cd liboqs
-   cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
-   cmake --build build -j"$(nproc)"
-   sudo cmake --install build
-   cd ..
-   pip install oqs --no-binary oqs
-   ```
+# Option A — pass the backend on the CLI
+npx nodemon -- .\server.js --py-backend=http://<KALI_IP>:5000
 
-   🚀 Run the Demo
-   With your venv active:
-   ```bash
-   python3 main.py
-   ```
+# Option B — set the env var for your session
+$env:PY_BACKEND = "http://<KALI_IP>:5000"
+npx nodemon .\server.js
 
-   Expected:
+# Option C — use a .env file with PY_BACKEND=http://<KALI_IP>:5000 and install dotenv
+npm install dotenv --save
+npx nodemon .\server.js
+```
 
-   - Key exchange using Kyber
-   - Digital signature with Dilithium
-   - Symmetric encryption with AES-GCM
-   - Hashing with SHA3-256
-   - Console logs showing secure communication flow
-   - You can modify `demo.py` to experiment with different messages or flows.
+Replace `<KALI_IP>` with the IP assigned to the Kali VM that is reachable from Windows (for example `192.168.0.162`). If your VM is NATed and you can't reach that IP, use port-forwarding or an SSH tunnel (see section below).
 
-   ## Configuration
-   You can control runtime behavior with environment variables.<br>
-   Recommended variables:
+3) Open the web UI
 
-   - `QA_LOG_LEVEL` — logging level (e.g., `INFO`, `DEBUG`, default: `INFO`)
-   - `QA_OQS_PROVIDER` — (optional) which OQS provider/binding to use if the code supports multiple providers
+Open a browser on Windows and visit `http://localhost:3001/`.
+- Use the Register form to create a user. The Python backend will create keys and an encrypted credential file on the Kali machine.
+- Use the Login form to decrypt and verify the credential using the stored private key (the decryption occurs on Kali).
 
-   ## 🔒 Security Notes
-   - This project is a demo and not production-ready.
-   - Do not use for protecting real secrets.
-   - Private keys must be kept out of source control (add to .gitignore).
+Troubleshooting — networking
+- If Node shows `Proxy error: TypeError: fetch failed` it means Node couldn't reach the Python backend. Verify:
+  - The Python server is running and listening on the expected port on Kali: `ss -ltnp | grep 5000` (Kali).
+  - From Windows, verify TCP reachability: `Test-NetConnection -ComputerName <KALI_IP> -Port 5000 -InformationLevel Detailed` (PowerShell).
+  - Use the direct HTTP test from Windows to the Python server: `Invoke-RestMethod -Uri "http://<KALI_IP>:5000/api/register" -Method Post -Body $body -ContentType 'application/json'`.
 
-   ## 👨‍💻 Maintainer
-   Bharath Honakatti<br>
-   🌐 **Portfolio:** [bharathhonakatti26.github.io](https://bharathhonakatti26.github.io/portfolio/)
+If the host cannot reach the guest's NAT IP (e.g. `10.0.2.8`), do one of:
+- Switch VM to Bridged networking (guest gets a LAN IP reachable from host). Then use that IP as `<KALI_IP>`.
+- Add a NAT port-forward rule (host port 5000 -> guest 5000) in your hypervisor so Windows can access the service via `localhost:5000`.
+- Create an SSH tunnel from Windows:
+  `ssh -L 5000:localhost:5000 user@<KALI_IP> -N` and then point Node at `http://localhost:5000`.
 
+Security notes
+- This demo stores private keys and encrypted credentials on disk in the `Keys/` and `Credentials/` folders. This is fine for local testing but not for production.
+- The Flask built-in server is not production-grade. For production, use a proper WSGI server and TLS.
 
-   ## References
-   - [Open Quantum Safe (liboqs)](https://github.com/open-quantum-safe/liboqs)
-   - [NIST Post-Quantum Cryptography Project](https://csrc.nist.gov/projects/post-quantum-cryptography)
+Developer notes / next steps
+- I added support for `--py-backend` and `.env` in `server.js` so you can configure the Python backend easily.
+- You can add more endpoints to `main.py` (list users, delete credentials) but be careful with exposing private key information.
+- If you want, I can add a small README section describing how to package this in Docker or how to add HTTPS.
 
-   ---
+Files written at runtime
+- On the Kali VM: `Keys/<prefix>.kem.pub`, `Keys/<prefix>.kem.priv`, `Keys/<prefix>.sig.pub`, `Keys/<prefix>.sig.priv` (if signatures exported).
+- Encrypted credential: `Credentials/<prefix>.enc` (JSON envelope).
 
-   Enjoy experimenting with Quantum Aegis.
+If you want me to: I can add a short `README` section that shows the exact copy/paste commands for your current environment (I'll fill in `192.168.0.162` as Kali IP if you confirm), or I can add a small `Makefile`/PowerShell script to start both services. Tell me which and I'll add it.
+
+---
+Generated on: 2025-11-05

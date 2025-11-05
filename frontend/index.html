@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>User Form</title>
+</head>
+<body>
+  <h2>User Registration</h2>
+  <nav>
+    <a href="#" id="linkRegister">Register</a> |
+    <a href="#" id="linkLogin">Login</a>
+  </nav>
+
+  <section id="registerSection">
+    <h3>Register</h3>
+    <form id="registerForm">
+      <label>Username:</label><br/>
+      <input type="text" id="reg_username" required/><br/><br/>
+
+      <label>Password:</label><br/>
+      <input type="password" id="reg_password" required/><br/><br/>
+
+      <label>Email:</label><br/>
+      <input type="email" id="reg_email" required/><br/><br/>
+
+      <button type="submit">Register</button>
+    </form>
+    <div id="regMessage"></div>
+  </section>
+
+  <section id="loginSection" style="display:none">
+    <h3>Login</h3>
+    <form id="loginForm">
+      <label>Email:</label><br/>
+      <input type="email" id="login_email" required/><br/><br/>
+
+      <label>Password:</label><br/>
+      <input type="password" id="login_password" required/><br/><br/>
+
+      <button type="submit">Login</button>
+    </form>
+    <div id="loginMessage"></div>
+    <pre id="loginResult"></pre>
+  </section>
+
+  <script>
+  const linkRegister = document.getElementById('linkRegister');
+  const linkLogin = document.getElementById('linkLogin');
+  const registerSection = document.getElementById('registerSection');
+  const loginSection = document.getElementById('loginSection');
+
+  linkRegister.addEventListener('click', (e) => {
+    e.preventDefault();
+    registerSection.style.display = '';
+    loginSection.style.display = 'none';
+  });
+
+  linkLogin.addEventListener('click', (e) => {
+    e.preventDefault();
+    registerSection.style.display = 'none';
+    loginSection.style.display = '';
+  });
+
+  document.getElementById('registerForm').addEventListener('submit', async function (e) {
+    e.preventDefault();
+    const data = {
+      username: document.getElementById('reg_username').value,
+      password: document.getElementById('reg_password').value,
+      email: document.getElementById('reg_email').value
+    };
+    const msg = document.getElementById('regMessage');
+    msg.textContent = '';
+    try {
+      const res = await fetch('http://localhost:3001/api/register', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data)
+      });
+      const bodyRes = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        msg.textContent = bodyRes.error || bodyRes.detail || ('Register failed: ' + res.status);
+        msg.style.color = 'red';
+        return;
+      }
+      msg.textContent = 'Registration successful.';
+      msg.style.color = 'green';
+    } catch (err) {
+      console.error(err);
+      msg.textContent = 'Network error';
+      msg.style.color = 'red';
+    }
+  });
+
+  document.getElementById('loginForm').addEventListener('submit', async function (e) {
+    e.preventDefault();
+    const data = {
+      email: document.getElementById('login_email').value,
+      password: document.getElementById('login_password').value
+    };
+    const msg = document.getElementById('loginMessage');
+    const out = document.getElementById('loginResult');
+    msg.textContent = '';
+    out.textContent = '';
+    try {
+      const res = await fetch('http://localhost:3001/api/login', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data)
+      });
+      const bodyRes = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        msg.textContent = bodyRes.error || ('Login failed: ' + res.status);
+        msg.style.color = 'red';
+        return;
+      }
+      msg.textContent = bodyRes.message || 'Login successful';
+      msg.style.color = 'green';
+      out.textContent = JSON.stringify(bodyRes.user || bodyRes.result || {}, null, 2);
+    } catch (err) {
+      console.error(err);
+      msg.textContent = 'Network error';
+      msg.style.color = 'red';
+    }
+  });
+  </script>
+</body>
+</html>

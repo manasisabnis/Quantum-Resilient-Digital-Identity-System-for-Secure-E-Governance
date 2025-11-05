@@ -279,6 +279,7 @@ def interactive_register():
     Create keys and write a credential envelope for a new user. Uses
     helper functions to keep the function small and testable.
     """
+    # interactive CLI wrapper around the programmatic register function
     print("== Register (create credential + keys) ==")
     username = input("Username: ").strip()
     email = input("Email: ").strip()
@@ -288,19 +289,35 @@ def interactive_register():
         print("Email required.")
         return
 
+    try:
+        register_user(username=username, email=email, password=password)
+    except Exception as exc:  # pylint: disable=broad-exception-caught
+        print("Registration failed:", exc)
+
+
+def register_user(*, username: str, email: str, password: str, export_sig_private: bool = True) -> dict:
+    """Programmatic registration used by the HTTP API and CLI.
+
+    Generates KEM and signature keys, encapsulates to the generated KEM
+    public key, derives the AES key from the shared secret and writes the
+    credential envelope to disk under `Credentials/` and keys under `Keys/`.
+
+    Returns a dict with metadata about the created credential (prefix, paths).
+    """
+    if not email:
+        raise ValueError("email required")
+
     ensure_dirs()
     prefix = sanitize_prefix(email)
 
-    pub, _ = _generate_kem_keys(prefix)
-    spub, spriv = _generate_sig_keys(prefix)
+    pub, priv = _generate_kem_keys(prefix)
+    spub, spriv = _generate_sig_keys(prefix) if export_sig_private else (None, None)
 
     kem_enc = KyberKeyExchange()
     encapsulated, shared = kem_enc.encapsulate(pub)
     if shared is None:
-        print("Error: KEM did not return shared secret; aborting.")
-        return
+        raise RuntimeError("KEM did not return shared secret")
 
-    # Build and store the envelope using a helper to keep this function small
     ctx = {
         "encapsulated": encapsulated,
         "shared": shared,
@@ -312,6 +329,15 @@ def interactive_register():
         "mechanism": kem_enc.mechanism,
     }
     _create_envelope_and_store(ctx)
+
+    return {
+        "prefix": prefix,
+        "kem_pub": str(Path("Keys") / (prefix + ".kem.pub")),
+        "kem_priv": str(Path("Keys") / (prefix + ".kem.priv")),
+        "sig_pub": str(Path("Keys") / (prefix + ".sig.pub")) if spub is not None else None,
+        "sig_priv": str(Path("Keys") / (prefix + ".sig.priv")) if spriv is not None else None,
+        "envelope": str(Path("Credentials") / (prefix + ".enc")),
+    }
 
 
 def interactive_login():
@@ -387,12 +413,122 @@ def interactive_loop():
             print("Invalid selection.")
 
 
+def _make_flask_app():
+    """Create and return a Flask app that exposes /api/register."""
+    try:
+        from flask import Flask, request, jsonify
+    except Exception as exc:  # pragma: no cover - runtime import error
+        raise RuntimeError("Flask is required to run the HTTP server: pip install flask") from exc
+
+    app = Flask(__name__)
+
+    @app.route('/api/register', methods=['POST'])
+    def api_register():
+        # accept JSON body with username, email, password
+        try:
+            payload = request.get_json(force=True)
+        except Exception:
+            payload = None
+
+        if not payload:
+            # also accept form data
+            payload = {
+                'username': request.form.get('username'),
+                'email': request.form.get('email'),
+                'password': request.form.get('password'),
+            }
+
+        username = payload.get('username') if isinstance(payload, dict) else None
+        email = payload.get('email') if isinstance(payload, dict) else None
+        password = payload.get('password') if isinstance(payload, dict) else None
+
+        if not email:
+            return jsonify({'error': 'email required'}), 400
+        if not password:
+            return jsonify({'error': 'password required'}), 400
+        if not username:
+            username = email.split('@', 1)[0]
+
+        try:
+            result = register_user(username=username, email=email, password=password)
+        except Exception as exc:
+            return jsonify({'error': 'registration failed', 'detail': str(exc)}), 500
+
+        return jsonify({'status': 'ok', 'result': result}), 201
+
+    @app.route('/api/login', methods=['POST'])
+    def api_login():
+        try:
+            payload = request.get_json(force=True)
+        except Exception:
+            payload = None
+
+        if not payload:
+            payload = {
+                'email': request.form.get('email'),
+                'password': request.form.get('password'),
+            }
+
+        email = payload.get('email') if isinstance(payload, dict) else None
+        password = payload.get('password') if isinstance(payload, dict) else None
+
+        if not email or not password:
+            return jsonify({'error': 'email and password required'}), 400
+
+        # locate envelope
+        env_path = resolve_encrypted_path(sanitize_prefix(email) + '.enc')
+        if not env_path.exists():
+            return jsonify({'error': 'credential not found'}), 404
+
+        try:
+            env = json.loads(env_path.read_text(encoding='utf-8'))
+        except Exception as exc:
+            return jsonify({'error': 'invalid envelope', 'detail': str(exc)}), 400
+
+        if not _verify_env_signature(env):
+            return jsonify({'error': 'signature verification failed'}), 400
+
+        priv_path = Path('Keys') / (sanitize_prefix(email) + '.kem.priv')
+        if not priv_path.exists():
+            return jsonify({'error': 'private key not found for this account'}), 404
+
+        priv = read_binary_b64(priv_path)
+        creds = _decrypt_envelope_with_priv(priv, env)
+        if creds is None:
+            return jsonify({'error': 'decryption failed'}), 400
+
+        stored_password = creds.get('password')
+        if stored_password == password:
+            # don't return password back to client
+            user = {k: v for k, v in creds.items() if k != 'password'}
+            return jsonify({'status': 'ok', 'message': 'login successful', 'user': user}), 200
+        return jsonify({'error': 'invalid credentials'}), 401
+
+    return app
+
+
+def run_http_server(host: str = '0.0.0.0', port: int = 5000):
+    app = _make_flask_app()
+    # Use Flask's built-in server for simplicity; suitable for development/testing.
+    app.run(host=host, port=port)
+
+
 if __name__ == "__main__":
-    # When run without extra arguments, use interactive mode
+    # support running as an HTTP service with `--http` or `--serve` flag
     if len(sys.argv) == 1:
         interactive_loop()
     else:
-        print(
-            "This script now runs interactively. Run without args "
-            "(python main.py)."
-        )
+        # check for http/serve flags
+        if any(a in ("--http", "--serve", "--api") for a in sys.argv[1:]):
+            # allow optional host/port via env or args
+            import os
+
+            host = os.environ.get('PY_HOST', '0.0.0.0')
+            port = int(os.environ.get('PY_PORT', '5000'))
+            print(f"Starting HTTP registration server on {host}:{port}")
+            run_http_server(host=host, port=port)
+        else:
+            print(
+                "This script now runs interactively. Run without args (python main.py).\n"
+                "To run as an HTTP server, pass --http or set environment variables PY_HOST/PY_PORT and run with --http."
+            )
