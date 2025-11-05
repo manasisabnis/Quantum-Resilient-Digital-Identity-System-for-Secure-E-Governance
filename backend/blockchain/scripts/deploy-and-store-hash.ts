@@ -12,25 +12,33 @@ async function main() {
   console.log("Deploying contracts with the account:", deployer.address);
   console.log("Account balance:", (await ethers.provider.getBalance(deployer.address)).toString());
 
-  // Deploy the Counter contract
-  const Counter = await ethers.getContractFactory("Counter");
-  const counter = await Counter.deploy();
+  // Deploy the DataHashStore contract
+  const DataHashStore = await ethers.getContractFactory("DataHashStore");
+  const dataHashStore = await DataHashStore.deploy();
 
-  await counter.waitForDeployment();
+  await dataHashStore.waitForDeployment();
 
-  const counterAddress = await counter.getAddress();
-  console.log("Counter deployed to:", counterAddress);
+  const dataHashStoreAddress = await dataHashStore.getAddress();
+  console.log("DataHashStore deployed to:", dataHashStoreAddress);
 
   // Generate a SHA3-256 hash (example: hash of "test data")
   const data = "test data";
-  const hash = ethers.keccak256(ethers.toUtf8Bytes(data)); // Note: ethers uses keccak256, which is SHA3-256 equivalent for Ethereum
-  console.log("SHA3-256 hash:", hash);
+  const dataId = "user-doc-123"; // The ID for the hash
+  const hash = ethers.keccak256(ethers.toUtf8Bytes(data)); 
+  console.log(`SHA3-256 hash for '${data}':`, hash);
 
   // Store the hash in the contract
-  const tx = await counter.storeHash(hash);
+  const tx = await dataHashStore.storeHash(dataId, hash);
   await tx.wait();
 
-  console.log("Hash stored on chain:", hash);
+  console.log(`Hash stored on chain for ID '${dataId}':`, hash);
+
+  // --- Optional: Verify the hash ---
+  const storedHash = await dataHashStore.getHash(dataId);
+  console.log(`Retrieved hash from contract:`, storedHash);
+  
+  const isMatch = await dataHashStore.verifyHash(dataId, hash);
+  console.log(`Verification successful:`, isMatch);
 }
 
 main()
