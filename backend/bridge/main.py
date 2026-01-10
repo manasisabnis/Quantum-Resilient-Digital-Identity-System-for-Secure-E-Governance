@@ -2,6 +2,10 @@ from flask import Flask, request, jsonify
 from flask_cors import CORS
 from pymongo import MongoClient
 import os
+import sys
+BASE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+sys.path.append(BASE_DIR)
+from crypto_modules.hashing import SHA3Hash
 
 app = Flask(__name__)
 CORS(app)
@@ -40,7 +44,21 @@ def register():
     }
 
     result = users.insert_one(doc)
-    return jsonify({'message': 'User registered', 'id': str(result.inserted_id)}), 201
+
+# ---- BRIDGE ADDITION START ----
+# Create deterministic data to hash (demo-safe)
+    data_to_hash = f"{username}:{email}".encode()
+
+# SHA3-256 → 64 hex chars (NO 0x)
+    digest = SHA3Hash.hexdigest(data_to_hash)
+# ---- BRIDGE ADDITION END ----
+    print("DEBUG HASH:", digest, len(digest))
+
+    return jsonify({
+    "id": str(result.inserted_id),
+    "hash": digest
+     }), 201
+
 
 
 if __name__ == '__main__':

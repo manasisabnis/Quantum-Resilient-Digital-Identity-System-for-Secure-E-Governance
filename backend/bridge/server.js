@@ -1,6 +1,8 @@
 const http = require('http');
 const fs = require('fs');
 const path = require('path');
+const { storeHash } = require("../utils/blockchain_utils.js");
+
 
 // Provide a robust `fetch` implementation that works on Node 18+ (global fetch)
 // and falls back to dynamic import of node-fetch when needed. This avoids
@@ -71,10 +73,49 @@ const server = http.createServer(async (req, res) => {
       });
 
       const text = await backendRes.text();
-      // forward status and headers (and include CORS)
-      setCorsHeaders({ 'Content-Type': backendRes.headers.get('content-type') || 'application/json' });
-      res.writeHead(backendRes.status);
-      res.end(text);
+      const responseData = JSON.parse(text);
+
+    if (!responseData.hash) {
+  // Python returned an error or non-hash response
+  setCorsHeaders({ 'Content-Type': 'application/json' });
+  res.writeHead(backendRes.status);
+  res.end(JSON.stringify(responseData));
+  return;
+  }
+
+
+// EXPECTED from Python:
+// { id: "...", hash: "abc123..." }
+
+      const { id, hash } = responseData;
+
+// Convert SHA3-256 hex → bytes32 for Solidity
+    const rawHash = String(hash).trim().toLowerCase();
+
+// Hard enforce bytes32
+const normalizedHash = rawHash.startsWith("0x")
+  ? rawHash.slice(2)
+  : rawHash;
+
+if (normalizedHash.length !== 64 || !/^[0-9a-f]{64}$/.test(normalizedHash)) {
+  throw new Error(`Invalid bytes32 hash format: ${normalizedHash} (len=${normalizedHash.length})`);
+}
+
+const bytes32Hash = "0x" + normalizedHash;
+
+
+
+// Store hash on blockchain
+     await storeHash(id, bytes32Hash);
+
+// Respond back to client
+     setCorsHeaders({ 'Content-Type': 'application/json' });
+     res.writeHead(backendRes.status);
+     res.end(JSON.stringify({
+      ...responseData,
+       blockchain: "hash stored on ganache"
+     }));
+
     } catch (err) {
       console.error('Proxy error:', err);
       setCorsHeaders({ 'Content-Type': 'application/json' });

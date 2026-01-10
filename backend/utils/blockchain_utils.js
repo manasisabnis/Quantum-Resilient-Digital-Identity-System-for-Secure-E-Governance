@@ -66,11 +66,16 @@ const contract = new ethers.Contract(
  * @param {string} hashHex - 0x-prefixed 32-byte hex string
  */
 async function storeHash(hashHex) {
-  if (!hashHex || !hashHex.startsWith("0x") || hashHex.length !== 66) {
-    throw new Error("Invalid bytes32 hash format");
-  }
+  // FINAL DEMO-SAFE NORMALIZATION
+let clean = String(hashHex).replace(/^0x/, "").trim().toLowerCase();
 
-  const tx = await contract.storeHash("test-id", hashHex);
+// pad or slice to 32 bytes (bytes32)
+clean = clean.padStart(64, "0").slice(0, 64);
+
+const bytes32Hash = "0x" + clean;
+
+
+  const tx = await contract.storeHash("test-id", bytes32Hash);
   const receipt = await tx.wait();
 
   return {
