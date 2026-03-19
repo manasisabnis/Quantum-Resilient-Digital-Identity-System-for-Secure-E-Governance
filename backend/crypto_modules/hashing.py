@@ -41,4 +41,8 @@ class SHA3Hash:
         Returns:
             str: Hexadecimal representation of the digest.
         """
+<<<<<<< HEAD
         return SHA3Hash.hash(data).hex()
+=======
+        return SHA3Hash.hash(data).hex()
+>>>>>>> bharath/development

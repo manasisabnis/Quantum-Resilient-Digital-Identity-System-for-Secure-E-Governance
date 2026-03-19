@@ -99,4 +99,8 @@ class DilithiumSignature:
         try:
             return sig.verify(message, signature, public_key)
         except (RuntimeError, TypeError, ValueError):
+<<<<<<< HEAD
             return False
+=======
+            return False
+>>>>>>> bharath/development

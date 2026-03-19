@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Secure Identity Console</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div class="container">
+
+  <div class="header">
+    <h1> Secure Identity Console</h1>
+    <p>Quantum-Resilient Identity Processing System</p>
+  </div>
+
+  <div class="main">
+
+    <!-- LEFT PANEL -->
+    <div class="panel input-panel">
+      <h2>Input</h2>
+
+      <label>Name</label>
+      <input id="name">
+
+      <label>ID</label>
+      <input id="id">
+
+      <button onclick="runProcess()">Run Process</button>
+    </div>
+
+    <!-- RIGHT PANEL -->
+    <div class="panel output-panel">
+      <h2>System Output</h2>
+
+      <div class="log" id="log"></div>
+    </div>
+
+  </div>
+
+</div>
+
+<script src="app.js"></script>
+</body>
+</html>

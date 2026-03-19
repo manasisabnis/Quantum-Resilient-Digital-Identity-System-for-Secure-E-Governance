@@ -57,4 +57,8 @@ class AES256GCM:
         Returns:
             bytes: Decrypted plaintext.
         """
+<<<<<<< HEAD
         return self.aesgcm.decrypt(nonce, ciphertext, associated_data)
+=======
+        return self.aesgcm.decrypt(nonce, ciphertext, associated_data)
+>>>>>>> bharath/development

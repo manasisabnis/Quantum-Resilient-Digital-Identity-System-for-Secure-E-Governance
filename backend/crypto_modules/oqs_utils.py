@@ -36,4 +36,8 @@ def export_secret_if_missing(instance) -> Optional[bytes]:
             return instance.export_secret_key()
         except (RuntimeError, TypeError, ValueError):
             return None
+<<<<<<< HEAD
     return None
+=======
+    return None
+>>>>>>> bharath/development
